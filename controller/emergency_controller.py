@@ -20,10 +20,16 @@ WHAT IT DOES
                   bottleneck port (s1 towards s3). At 7 Mbps or more we move normal
                   traffic onto the alternate path s1-s2-s3 for 15 s.
 
+  5. FAILOVER     (dynamic mode only) if the direct link s1-s3 goes down (a switch reports
+                  the port link-down), ALL traffic, emergency included, is moved onto the
+                  alternate path s1-s2-s3 right away. Emergency packets keep queue 1 on
+                  the alternate links. When the link comes back everything returns to
+                  the direct path.
+
 MODES
   static    BASELINE: routing only. No emergency rule, no reaction to anything.
   priority  routing + emergency rule (queue 1).
-  dynamic   priority + congestion / alert-triggered rerouting.
+  dynamic   priority + congestion / alert-triggered rerouting + link-failure failover.
 """
 import json
 import os
@@ -56,6 +62,11 @@ class EmergencyController(app_manager.RyuApp):
         self.rerouted = False            # True while normal traffic uses the alternate path
         self.reroute_until = 0.0         # time until which the reroute is kept
         self.last_tx = None              # (tx_bytes, time) from the previous poll
+        # the two ends of the direct link s1-s3, as (dpid, port): (1, 3) and (3, 5)
+        a, b = cfg.LINKS[(1, 3)]
+        self.direct_ends = {(1, a), (3, b)}
+        self.down_ends = set()           # direct-link ends currently reported down
+        self.direct_down = False         # True while the direct link is down
         self.logger.info('controller started, mode=%s', self.mode)
         hub.spawn(self._monitor)         # background task: poll port statistics
 
@@ -67,7 +78,10 @@ class EmergencyController(app_manager.RyuApp):
         dp = ev.msg.datapath
         self.dps[dp.id] = dp
         self.logger.info('switch s%s connected', dp.id)
+        self.down_ends = {e for e in self.down_ends if e[0] != dp.id}   # forget stale state from a previous network
         self.install_all(dp)
+        # learn the current port states too, in case the link was already down
+        dp.send_msg(dp.ofproto_parser.OFPPortDescStatsRequest(dp, 0))
 
     def install_all(self, dp):
         self.delete_all_flows(dp)
@@ -92,6 +106,10 @@ class EmergencyController(app_manager.RyuApp):
                                       out_port=ofp.OFPP_ANY, out_group=ofp.OFPG_ANY,
                                       match=parser.OFPMatch()))
 
+    def failover(self):
+        """True when the direct link is down and this mode is allowed to react (dynamic)."""
+        return self.mode == 'dynamic' and self.direct_down
+
     def out_port(self, dp, dst_ip, use_alt):
         """Output port on switch dp for a packet going to dst_ip."""
         dst_sw, host_port = cfg.HOST_BY_IP[dst_ip]
@@ -107,18 +125,18 @@ class EmergencyController(app_manager.RyuApp):
         parser = dp.ofproto_parser
         for ip in cfg.HOST_BY_IP:
             match = parser.OFPMatch(eth_type=ETH_IP, ipv4_dst=ip)
-            actions = [parser.OFPActionOutput(self.out_port(dp, ip, self.rerouted))]
+            actions = [parser.OFPActionOutput(self.out_port(dp, ip, self.rerouted or self.failover()))]
             self.add_flow(dp, PRIO_BEST, match, actions)
 
     # ------------------------------------------------------------------
-    # Rule type 2: emergency traffic, priority 100 (queue 1, always direct path)
+    # Rule type 2: emergency traffic, priority 100 (queue 1, direct path; alternate if failover)
     # ------------------------------------------------------------------
     def install_emergency(self, dp):
         if self.mode == 'static':                 # baseline: no special treatment
             return
         parser = dp.ofproto_parser
         for ip in cfg.HOST_BY_IP:
-            port = self.out_port(dp, ip, False)
+            port = self.out_port(dp, ip, self.failover())
             actions = [parser.OFPActionOutput(port)]
             if cfg.HOST_BY_IP[ip][0] != dp.id:    # leaving towards another switch:
                 actions.insert(0, parser.OFPActionSetQueue(cfg.Q_EMERGENCY))  # use queue 1
@@ -138,6 +156,47 @@ class EmergencyController(app_manager.RyuApp):
         match = parser.OFPMatch(eth_type=ETH_IP, ip_proto=IP_UDP, udp_dst=cfg.CTL_PORT)
         actions = [parser.OFPActionOutput(ofp.OFPP_CONTROLLER, ofp.OFPCML_NO_BUFFER)]
         self.add_flow(dp, PRIO_EVENT, match, actions)
+
+    # ------------------------------------------------------------------
+    # 5. FAILOVER: react when the direct link s1-s3 goes down or comes back
+    # ------------------------------------------------------------------
+    @set_ev_cls(ofp_event.EventOFPPortStatus, MAIN_DISPATCHER)
+    def on_port_status(self, ev):
+        msg = ev.msg
+        dp, port = msg.datapath, msg.desc
+        gone = msg.reason == dp.ofproto.OFPPR_DELETE
+        self.set_port_state(dp, port, gone)
+
+    @set_ev_cls(ofp_event.EventOFPPortDescStatsReply, MAIN_DISPATCHER)
+    def on_port_desc(self, ev):
+        dp = ev.msg.datapath
+        for port in ev.msg.body:
+            self.set_port_state(dp, port, False)
+
+    def set_port_state(self, dp, port, gone):
+        key = (dp.id, port.port_no)
+        if key not in self.direct_ends:
+            return
+        ofp = dp.ofproto
+        down = gone or bool(port.state & ofp.OFPPS_LINK_DOWN) or bool(port.config & ofp.OFPPC_PORT_DOWN)
+        if down:
+            self.down_ends.add(key)
+        else:
+            self.down_ends.discard(key)
+        now_down = bool(self.down_ends)
+        if now_down == self.direct_down:
+            return
+        self.direct_down = now_down
+        if self.mode != 'dynamic':
+            self.logger.info('LINK s1-s3 %s (mode=%s: no failover, alerts %s)',
+                             'DOWN' if now_down else 'UP', self.mode,
+                             'will be lost' if now_down else 'flow again')
+            return
+        self.logger.info('LINK s1-s3 %s -> %s', 'DOWN' if now_down else 'UP',
+                         'FAILOVER: all traffic via s2' if now_down else 'back to the direct path')
+        for d in self.dps.values():                # overwrite priority-10 and priority-100 rules
+            self.install_best_effort(d)
+            self.install_emergency(d)
 
     # ------------------------------------------------------------------
     # 3. APP -> SDN: events arrive as packet-in messages

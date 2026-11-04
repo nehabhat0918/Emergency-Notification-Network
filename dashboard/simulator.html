@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>SDN Emergency Alert Console</title>
+<meta name="favicon" content="🚨">
+<style>
+:root{--bg:#f4f1ea;--card:#fffdf8;--ink:#1d1b16;--mut:#6f6a5d;--line:#ddd6c6;--em:#d9480f;--ok:#2f8f4e;--bad:#c92a2a;--be:#3b6fb6;--alt:#8a63d2;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#14130f;--card:#1e1c16;--ink:#f0ece0;--mut:#9a947f;--line:#34311f;--em:#ff8a4c;--ok:#5ccf84;--bad:#ff6b6b;--be:#6fa3ec;--alt:#b08cf0}}
+:root[data-theme="dark"]{--bg:#14130f;--card:#1e1c16;--ink:#f0ece0;--mut:#9a947f;--line:#34311f;--em:#ff8a4c;--ok:#5ccf84;--bad:#ff6b6b;--be:#6fa3ec;--alt:#b08cf0}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.4 "Segoe UI",system-ui,sans-serif}
+header{padding:14px 16px 4px}h1{margin:0;font:700 19px "Courier New",monospace;letter-spacing:.5px}h1 span{color:var(--em)}
+.sub{color:var(--mut);font-size:12.5px;margin-top:2px}
+nav{display:flex;gap:6px;padding:10px 16px;position:sticky;top:env(safe-area-inset-top,0px);background:var(--bg);z-index:5}
+nav button{flex:1;padding:9px;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:8px;font:600 13px inherit}
+nav button.on{background:var(--ink);color:var(--bg)}
+main{padding:0 16px 24px;max-width:900px;margin:auto}.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:12px}
+h2{margin:0 0 8px;font:700 12px "Courier New",monospace;text-transform:uppercase;letter-spacing:1px;color:var(--mut)}
+.seg{display:flex;gap:6px}.seg button{flex:1;padding:9px 4px;border:1px solid var(--line);background:transparent;color:var(--ink);border-radius:8px;font:600 13px inherit}
+.seg button.on{background:var(--em);border-color:var(--em);color:#fff}
+.desc{font-size:12.5px;color:var(--mut);margin-top:6px;min-height:34px}
+.btns{display:grid;grid-template-columns:1fr 1fr;gap:8px}.btns button{padding:11px 6px;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--ink);font:600 13px inherit}
+.btns button.on{border-color:var(--bad);color:var(--bad)}.btns .go{background:var(--em);border-color:var(--em);color:#fff}
+svg{width:100%;height:auto;display:block}svg text{fill:var(--ink);font:11px "Courier New",monospace}
+.kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.k{border:1px solid var(--line);border-radius:10px;padding:8px}
+.k b{display:block;font:700 20px "Courier New",monospace}.k small{color:var(--mut);font-size:11px}
+#log{height:170px;overflow:auto;font:11.5px/1.5 "Courier New",monospace}#log div{border-bottom:1px dotted var(--line);padding:1px 0}
+.bad{color:var(--bad)}.ok{color:var(--ok)}.em{color:var(--em)}
+.drop{border:2px dashed var(--line);border-radius:12px;padding:22px;text-align:center;color:var(--mut)}
+table{width:100%;border-collapse:collapse;font:13px "Courier New",monospace}td{padding:5px 2px;border-bottom:1px solid var(--line)}td:last-child{text-align:right}
+.hide{display:none}pre{white-space:pre-wrap;font:12px/1.5 "Courier New",monospace;margin:0;overflow-x:auto}
+</style></head><body>
+<header><h1>SDN<span>/</span>EMERGENCY ALERT CONSOLE</h1>
+<div class="sub">Simulator of your Mininet + Ryu project · analyzer for your real CSV logs</div></header>
+<nav><button class="on" data-t="sim">Live simulation</button><button data-t="ana">Log analyzer</button><button data-t="cmd">Commands</button></nav>
+<main>
+<section id="sim">
+<div class="card"><h2>Controller mode</h2>
+<div class="seg" id="modes"><button data-m="static">static</button><button data-m="priority">priority</button><button data-m="dynamic" class="on">dynamic</button></div>
+<div class="desc" id="mdesc"></div></div>
+<div class="card"><h2>Network</h2>
+<svg viewBox="0 0 360 250" id="topo">
+<line id="L13" x1="70" y1="95" x2="290" y2="95" stroke="var(--be)" stroke-width="5"/>
+<line id="L12" x1="70" y1="95" x2="180" y2="190" stroke="var(--alt)" stroke-width="3" stroke-dasharray="5 4" opacity=".35"/>
+<line id="L23" x1="180" y1="190" x2="290" y2="95" stroke="var(--alt)" stroke-width="3" stroke-dasharray="5 4" opacity=".35"/>
+<text x="180" y="84" text-anchor="middle" id="bwtxt">direct s1–s3 · 0.0/10 Mbps</text>
+<g id="sw"></g><g id="dots"></g></svg>
+<div class="kpis" style="margin-top:8px"><div class="k"><b id="kLoad">0</b><small>Mbps on bottleneck</small></div><div class="k"><b id="kLat">–</b><small>avg alert latency ms</small></div><div class="k"><b id="kLoss">–</b><small>loss after retries</small></div></div></div>
+<div class="card"><h2>Scenario</h2><div class="btns">
+<button class="go" id="bAlert">🚨 Alert burst (20)</button><button id="bIperf">iperf 20 Mbps: OFF</button>
+<button id="bFail">Link s1–s3: UP</button><button id="bReset">Reset stats</button></div></div>
+<div class="card"><h2>Alert latency (ms) — recent</h2><svg viewBox="0 0 360 110" id="chart"></svg></div>
+<div class="card"><h2>Event log</h2><div id="log"></div></div>
+</section>
+
+<section id="ana" class="hide">
+<div class="card"><h2>Upload real logs</h2>
+<label class="drop" style="display:block">Tap to choose <b>server_log.csv</b> + <b>client_log_*.csv</b><input id="files" type="file" multiple accept=".csv" hidden></label></div>
+<div class="card hide" id="res"><h2>Results (same as analysis script)</h2><table id="tbl"></table><svg viewBox="0 0 360 110" id="chart2" style="margin-top:10px"></svg></div>
+</section>
+
+<section id="cmd" class="hide"><div class="card"><h2>Run the real thing</h2><pre>
+# T1  controller
+SDN_MODE=dynamic ryu-manager controller/emergency_controller.py
+# T2  topology (3 switches, 6 hosts)
+sudo python3 topo/b_test_topo.py
+# in mininet>
+h1 python3 server.py
+h2 python3 client.py 10.0.0.1
+h3 python3 client.py 10.0.0.1
+h6 iperf -s -u &
+h5 iperf -u -c 10.0.0.6 -b 20M -t 30 &
+h1 python3 bulk.py 100 0.05
+link s1 s3 down
+h1 python3 src/ctl_send.py mode static
+# analysis
+python3 analyze.py
+bash c_experiments.sh</pre></div></section>
+</main>
+<script>
+const $=s=>document.querySelector(s),NS="http://www.w3.org/2000/svg";
+const MODE_D={static:"Baseline: routing only. Alerts and iperf share one queue — expect loss under congestion.",priority:"Alerts (UDP :5000) go to high-priority queue 1 (6 Mbps guaranteed). iperf stays best-effort.",dynamic:"Priority + reroutes iperf via s2 for 15 s when the bottleneck hits 7 Mbps or an alert_start event arrives."};
+const S={mode:"dynamic",iperf:false,fail:false,rer:0,sent:0,acked:0,retry:0,lat:[],q:0,burst:0,seq:0,load:0};
+// nodes
+const N={s1:[70,95],s2:[180,190],s3:[290,95],h1:[30,40],h5:[30,150],h2:[330,40],h3:[330,95+0],h4:[330,150],h6:[290,215]};
+const NM={s1:"s1",s2:"s2",s3:"s3",h1:"h1 server",h5:"h5 iperf-src",h2:"h2",h3:"h3",h4:"h4",h6:"h6 sink"};
+const sw=$("#sw");
+for(const [k,[x,y]] of Object.entries(N)){if(k[0]=="h"){const l=document.createElementNS(NS,"line");[["x1",x],["y1",y]].forEach(a=>l.setAttribute(...a));const p=k=="h1"||k=="h5"?N.s1:N.s3;l.setAttribute("x2",p[0]);l.setAttribute("y2",p[1]);l.setAttribute("stroke","var(--line)");l.setAttribute("stroke-width",2);sw.append(l)}}
+for(const [k,[x,y]] of Object.entries(N)){const g=document.createElementNS(NS,"g"),s=k[0]=="s";
+g.innerHTML=s?`<rect x="${x-18}" y="${y-13}" width="36" height="26" rx="6" fill="var(--ink)"/><text x="${x}" y="${y+4}" text-anchor="middle" style="fill:var(--bg)">${k}</text>`:
+`<circle cx="${x}" cy="${y}" r="9" fill="${k=="h1"?"var(--em)":k=="h5"?"var(--be)":"var(--card)"}" stroke="var(--ink)"/><text x="${x}" y="${y+(y>100?22:-14)}" text-anchor="middle">${NM[k]}</text>`;sw.append(g)}
+function log(m,c=""){const d=document.createElement("div");d.className=c;d.textContent=new Date().toLocaleTimeString([],{hour12:false})+"  "+m;const L=$("#log");L.prepend(d);while(L.children.length>80)L.lastChild.remove()}
+function dot(path,col){const c=document.createElementNS(NS,"circle");c.setAttribute("r",4);c.setAttribute("fill",col);$("#dots").append(c);const t0=performance.now(),D=900;
+(function f(t){const u=Math.min(1,(t-t0)/D),n=path.length-1,i=Math.min(n-1,Math.floor(u*n)),v=u*n-i,a=N[path[i]],b=N[path[i+1]];c.setAttribute("cx",a[0]+(b[0]-a[0])*v);c.setAttribute("cy",a[1]+(b[1]-a[1])*v);u<1?requestAnimationFrame(f):c.remove()})(t0)}
+// model
+const rerouted=()=>S.mode=="dynamic"&&Date.now()<S.rer;
+function load(){const a=S.burst>0?2.5:0;let b=S.iperf?(rerouted()?0:20):0;return{em:a,be:b}}
+function deliver(client,attempt){ // returns {ok,lat}
+ const {em,be}=load(),tot=em+be;let p=0,lat=2+Math.random()*2;
+ if(S.fail){return{ok:false,lat:0}}
+ if(S.mode=="static"){const f=Math.min(1,tot/10);if(tot>10){p=1-10/tot;lat+=60+f*90*Math.random()}else lat+=tot*3}
+ else{lat+=em*1.2;if(S.mode=="priority"&&tot>10)lat+=Math.random()*6}
+ return{ok:Math.random()>p,lat:lat+Math.random()*3}}
+function sendAlert(){const seq=++S.seq,t0=Date.now();
+ for(const c of ["h2","h3"]){S.sent++;let at=1;
+  const tryit=()=>{const r=deliver(c,at),route=["h1","s1","s3",c];dot(route,"var(--em)");
+   if(r.ok){setTimeout(()=>{S.acked++;if(at>1)S.retry++;S.lat.push(r.lat+(at-1)*500);if(S.lat.length>60)S.lat.shift();log(`#${seq} → ${c} ACK ${r.lat.toFixed(1)}ms try ${at}`,"ok")},r.lat)}
+   else if(at<3){log(`#${seq} → ${c} lost, retry ${at+1}`,"bad");at++;setTimeout(tryit,500)}
+   else{log(`#${seq} → ${c} UNREACHABLE`,"bad")}};tryit()}}
+function startBurst(n){log("alert_start event → controller","em");if(S.mode=="dynamic"){S.rer=Date.now()+15000;log("REROUTE iperf via s2 (15 s hold)","em")}
+ S.burst=n;(function g(){if(S.burst>0){sendAlert();S.burst--;setTimeout(g,120)}})()}
+setInterval(()=>{const {em,be}=load();S.load=Math.min(10,em+be)*0.85+Math.random()*.3*(em+be>0);
+ if(S.mode=="dynamic"&&S.iperf&&!rerouted()&&be>=7){S.rer=Date.now()+15000;log("Congestion ≥7 Mbps → REROUTE iperf via s2","em")}
+ if(S.mode=="dynamic"&&S.iperf&&rerouted()&&!S._r){S._r=1}if(!rerouted())S._r=0;
+ if(S.iperf&&rerouted()&&Math.random()<.3)dot(["h5","s1","s2","s3","h6"],"var(--alt)");else if(S.iperf&&!rerouted()&&!S.fail&&Math.random()<.5)dot(["h5","s1","s3","h6"],"var(--be)");
+ view()},300);
+function view(){const rr=rerouted();$("#L12").style.opacity=$("#L23").style.opacity=rr?1:.35;
+ $("#L13").setAttribute("stroke",S.fail?"var(--bad)":"var(--be)");$("#L13").setAttribute("stroke-dasharray",S.fail?"4 8":"");
+ $("#bwtxt").textContent=S.fail?"direct s1–s3 · LINK DOWN":`direct s1–s3 · ${S.load.toFixed(1)}/10 Mbps`+(rr?" · iperf rerouted":"");
+ $("#kLoad").textContent=S.load.toFixed(1);const a=S.lat;$("#kLat").textContent=a.length?(a.reduce((x,y)=>x+y)/a.length).toFixed(1):"–";
+ $("#kLoss").textContent=S.sent?((S.sent-S.acked)/S.sent*100).toFixed(1)+"%":"–";line("#chart",S.lat)}
+function line(id,d){const svg=$(id);if(!d.length){svg.innerHTML="";return}const m=Math.max(10,...d),w=360,h=100;
+ const pts=d.map((v,i)=>`${(i/Math.max(1,d.length-1))*w},${h-(v/m)*(h-8)}`).join(" ");
+ svg.innerHTML=`<polyline points="${pts}" fill="none" stroke="var(--em)" stroke-width="2"/><text x="2" y="10">max ${m.toFixed(0)} ms</text>`}
+// controls
+document.querySelectorAll("#modes button").forEach(b=>b.onclick=()=>{S.mode=b.dataset.m;S.rer=0;document.querySelectorAll("#modes button").forEach(x=>x.classList.toggle("on",x==b));$("#mdesc").textContent=MODE_D[S.mode];log("MODE → "+S.mode,"em")});
+$("#mdesc").textContent=MODE_D.dynamic;
+$("#bAlert").onclick=()=>startBurst(20);
+$("#bIperf").onclick=e=>{S.iperf=!S.iperf;e.target.classList.toggle("on",S.iperf);e.target.textContent="iperf 20 Mbps: "+(S.iperf?"ON":"OFF");log("iperf "+(S.iperf?"started":"stopped"))};
+$("#bFail").onclick=e=>{S.fail=!S.fail;e.target.classList.toggle("on",S.fail);e.target.textContent="Link s1–s3: "+(S.fail?"DOWN":"UP");log(S.fail?"link s1 s3 down — emergency rule is pinned to the direct path, so alerts are lost":"link s1 s3 up",S.fail?"bad":"")};
+$("#bReset").onclick=()=>{Object.assign(S,{sent:0,acked:0,retry:0,lat:[]});$("#log").innerHTML=""};
+document.querySelectorAll("nav button").forEach(b=>b.onclick=()=>{document.querySelectorAll("nav button").forEach(x=>x.classList.toggle("on",x==b));["sim","ana","cmd"].forEach(t=>$("#"+t).classList.toggle("hide",t!=b.dataset.t))});
+// analyzer
+const csv=t=>{const [h,...r]=t.trim().split(/\r?\n/).map(l=>l.split(","));return r.map(c=>Object.fromEntries(h.map((k,i)=>[k.trim(),(c[i]||"").trim()])))};
+$("#files").onchange=async e=>{let srv=[],lat=[];for(const f of e.target.files){const r=csv(await f.text());if(/server/i.test(f.name))srv=srv.concat(r);else lat=lat.concat(r.map(x=>+x.latency_ms).filter(x=>!isNaN(x)))}
+ const sent=srv.length,ack=srv.filter(r=>r.status=="ACKED"),rt=ack.filter(r=>+r.attempts>1);lat.sort((a,b)=>a-b);
+ const row=(a,b)=>`<tr><td>${a}</td><td>${b}</td></tr>`,P=n=>sent?(n/sent*100).toFixed(2)+"%":"–";
+ let h=row("deliveries attempted",sent)+row("ACKed",ack.length)+row("needed retransmit",rt.length)+row("unreachable",sent-ack.length)+row("loss after retries",P(sent-ack.length))+row("first-try loss",P(rt.length));
+ if(lat.length){const av=lat.reduce((a,b)=>a+b)/lat.length;h+=row("latency avg",av.toFixed(3)+" ms")+row("median",lat[Math.floor(lat.length/2)].toFixed(3))+row("p95",lat[Math.max(0,Math.floor(lat.length*.95)-1)].toFixed(3))+row("max",lat.at(-1).toFixed(3))}
+ $("#tbl").innerHTML=h;$("#res").classList.remove("hide");line("#chart2",lat.slice(0,300))};
+log("console ready — try: iperf ON, then Alert burst, switch modes");view();
+</script></body></html>
