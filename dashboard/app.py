@@ -256,18 +256,25 @@ PAGE = r"""<!DOCTYPE html><html><head><meta charset=utf-8><meta name=viewport co
 <title>SDN Alert Console</title><style>
 :root{--bg:#f4f1ea;--c:#fffdf8;--ink:#1d1b16;--m:#6f6a5d;--l:#ddd6c6;--em:#d9480f;--bad:#c92a2a;--st:#d64545;--pr:#3b6fb6;--dy:#2f9e5a;--p95:#e8892b;--mx:#8b5cf6}
 @media(prefers-color-scheme:dark){:root{--bg:#12110d;--c:#1d1b15;--ink:#f0ece0;--m:#9a947f;--l:#36331f;--em:#ff8a4c;--bad:#ff6b6b;--st:#ff6b6b;--pr:#6fa3ec;--dy:#5ccf84;--p95:#ffb35c;--mx:#b08cf0}}
-*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px system-ui,sans-serif;padding:16px;max-width:1240px;margin:auto}
+html{overflow-anchor:none;scroll-behavior:smooth}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px system-ui,sans-serif;padding:16px;max-width:1240px;margin:auto}
 h1{font:800 20px monospace;margin:4px 0 12px}h1 b{color:var(--em)}h1 small{color:var(--m);font-weight:400}
 h2{font:700 11px monospace;text-transform:uppercase;letter-spacing:1px;color:var(--m);margin:0 0 10px}
-.c{background:var(--c);border:1px solid var(--l);border-radius:14px;padding:14px;margin-bottom:14px;min-width:0}
+.c{background:var(--c);border:1px solid var(--l);border-radius:14px;padding:14px;margin-bottom:14px;min-width:0;contain:layout paint style}
+body.scrolling *{animation-play-state:paused!important}body.scrolling{pointer-events:none}
 .row{display:grid;gap:14px}.r2{grid-template-columns:1fr 1fr}.r3{grid-template-columns:repeat(3,1fr)}.r21{grid-template-columns:1.6fr 1fr}
 @media(max-width:860px){.r2,.r3,.r21{grid-template-columns:1fr}}
 button{padding:9px 13px;border:1px solid var(--l);background:var(--c);color:var(--ink);border-radius:9px;font:600 13px system-ui;cursor:pointer}
-button:hover{border-color:var(--em)}button.on{background:var(--em);color:#fff;border-color:var(--em)}button.go{background:var(--em);color:#fff;border-color:var(--em)}button.dg{color:var(--bad)}
+button:hover{border-color:var(--em)}button.on{background:var(--em);color:#fff;border-color:var(--em)}button.go{background:var(--em);color:#fff;border-color:var(--em)}button.dg{color:var(--bad)}button.rd{background:var(--bad);color:#fff;border-color:var(--bad)}button.gn{background:var(--dy);color:#fff;border-color:var(--dy)}
+.tp{margin-top:12px}.tp .pr{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px}.pill{display:inline-block;padding:6px 12px;border-radius:99px;font:700 12px monospace;color:#fff;background:var(--m)}.pill.g{background:var(--dy)}.pill.o{background:var(--p95)}.pill.r{background:var(--bad)}
+.tp .nb{fill:var(--c);stroke:var(--l);stroke-width:1.5}.tp .nb.hot{stroke:var(--p95);stroke-width:3}.tp .hl{stroke:var(--m);stroke-width:2;fill:none;opacity:.6}
+.tp #dl{stroke-width:6;stroke-linecap:round;fill:none}.tp #dl.up{stroke:var(--dy)}.tp #dl.down{stroke:var(--bad);stroke-dasharray:4 9}.tp #dl.flow{stroke-dasharray:10 7;animation:fl .6s linear infinite}
+.tp #al{stroke:var(--p95);stroke-width:4;fill:none;stroke-dasharray:8 7;opacity:.3}.tp #al.on{opacity:1}.tp #al.flow{animation:fl .6s linear infinite}
+@keyframes fl{to{stroke-dashoffset:-34}}.tp #xm{display:none}.tp #xm.on{display:block}.tp #xm line{stroke:var(--bad);stroke-width:6;stroke-linecap:round}.tp #xm text{fill:var(--bad);font:700 13px monospace}
+
 .seg{display:flex;gap:6px;flex-wrap:wrap}.lab{font:600 12px system-ui;color:var(--m);margin:10px 0 4px;display:block}
 input[type=number]{width:100%;padding:9px;border:1px solid var(--l);border-radius:9px;background:var(--bg);color:var(--ink);font:15px monospace}
 .f{display:grid;grid-template-columns:1fr 1fr;gap:10px}.chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}.chips button{padding:5px 10px;font-size:12px}
-.load{height:10px;border-radius:6px;background:var(--l);overflow:hidden;margin-top:8px;position:relative}.load i{display:block;height:100%;background:var(--dy);transition:.2s}
+.load{height:10px;border-radius:6px;background:var(--l);overflow:hidden;margin-top:8px;position:relative}.load i{display:block;height:100%;background:var(--dy);transition:width .2s}
 .kp{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px}.k{border:1px solid var(--l);border-radius:11px;padding:10px}.k b{display:block;font:700 22px monospace}.k small{color:var(--m);font-size:11px}
 .mc{border-radius:14px;border:1px solid var(--l);border-top:5px solid var(--m);padding:14px;background:var(--c);position:relative}
 .mc h3{margin:0;font:700 13px monospace;text-transform:uppercase}.mc .big{font:800 34px monospace;margin:6px 0 0}.mc .big small{font-size:14px;color:var(--m)}
@@ -283,8 +290,27 @@ select,input[type=text]{width:100%;padding:9px;border:1px solid var(--l);border-
 <h1>SDN<b>/</b>ALERT CONSOLE <small>live · reads your real logs</small></h1>
 <div class="row r2">
  <div class=c><h2>1 · Controller mode</h2><div class=seg id=modes></div>
-  <span class=lab>Link and logs</span><div class=seg><button class=dg onclick="A('link_down')">link s1-s3 down</button><button onclick="A('link_up')">link up</button><button class=dg onclick="confirm('Delete logs? Stop server.py first.')&&A('clear')">clear logs</button></div>
-  <div id=msg></div></div>
+  <span class=lab>Link and logs</span><div class=seg><button id=bdown class=dg onclick="A('link_down')">link s1-s3 down</button><button id=bup class=gn onclick="A('link_up')">link up</button><button class=dg onclick="confirm('Delete logs? Stop server.py first.')&&A('clear')">clear logs</button></div>
+  <div id=msg></div>
+  <div class=tp>
+   <div class=pr><span id=pa class=pill>alerts</span><span id=pb class=pill>background traffic</span></div>
+   <svg id=tpsvg viewBox="0 0 600 330">
+    <path class=hl d="M110 42L170 65M110 106L170 95M460 65L500 42M460 95L500 106"/>
+    <path id=al d="M220 110V258H265M365 258H410V110"/>
+    <path id=dl class=up d="M270 80H360"/>
+    <g id=xm><line x1="305" y1="68" x2="325" y2="92"/><line x1="325" y1="68" x2="305" y2="92"/><text x="315" y="114" text-anchor="middle">LINK DOWN</text></g>
+    <rect class=nb x=10 y=20 width=100 height=44 rx=8 /><text x=60 y=38 text-anchor=middle style="font-weight:700;font-size:13px">h1</text><text x=60 y=54 text-anchor=middle class=ax>server</text>
+    <rect class=nb x=10 y=84 width=100 height=44 rx=8 /><text x=60 y=102 text-anchor=middle style="font-weight:700;font-size:13px">h5</text><text x=60 y=118 text-anchor=middle class=ax>iperf source</text>
+    <rect class=nb x=170 y=50 width=100 height=60 rx=8 /><text x=220 y=76 text-anchor=middle style="font-weight:700;font-size:14px">s1</text><text x=220 y=94 text-anchor=middle class=ax>server side</text>
+    <rect class=nb x=360 y=50 width=100 height=60 rx=8 /><text x=410 y=76 text-anchor=middle style="font-weight:700;font-size:14px">s3</text><text x=410 y=94 text-anchor=middle class=ax>client side</text>
+    <rect class=nb x=500 y=20 width=90 height=44 rx=8 /><text x=545 y=38 text-anchor=middle style="font-weight:700;font-size:13px">h2, h3, h4</text><text x=545 y=54 text-anchor=middle class=ax>clients</text>
+    <rect class=nb x=500 y=84 width=90 height=44 rx=8 /><text x=545 y=102 text-anchor=middle style="font-weight:700;font-size:13px">h6</text><text x=545 y=118 text-anchor=middle class=ax>iperf sink</text>
+    <rect id=ns2 class=nb x=265 y=230 width=100 height=56 rx=8 /><text x=315 y=254 text-anchor=middle style="font-weight:700;font-size:14px">s2</text><text x=315 y=272 text-anchor=middle class=ax>alternate</text>
+    <text x=315 y=40 text-anchor=middle class=ax>Direct link s1-s3</text>
+    <text x=315 y=306 text-anchor=middle class=ax>Alternate path via s2</text>
+   </svg>
+   <div class=leg><span><i style="background:var(--dy)"></i>direct path up</span><span><i style="background:var(--bad)"></i>direct link DOWN</span><span><i style="background:var(--p95)"></i>detour via s2 (in use when bright)</span></div>
+  </div></div>
  <div class=c><h2>2 · Traffic generator (any amount)</h2>
   <div class=f><div><span class=lab>Background traffic (Mbps)</span><input type=number id=rate value=20 min=0.1 max=1000 step=any></div><div><span class=lab>Duration (s)</span><input type=number id=dur value=120 min=1 max=3600></div></div>
   <span class=lab>Traffic class to send</span><select id=cls><option value=normal>Normal · UDP 5001 (best-effort queue)<option value=emergency>Emergency · UDP 5000 (priority queue)</select>
@@ -323,7 +349,12 @@ select,input[type=text]{width:100%;padding:9px;border:1px solid var(--l);border-
 <script>
 const $=s=>document.querySelector(s),MS=['static','priority','dynamic'],COL={static:'var(--st)',priority:'var(--pr)',dynamic:'var(--dy)'},f=v=>v==null?'–':(+v).toFixed(2).replace(/\.?0+$/,'');
 let scale='lin',last=null;
-async function A(a,v){$('#msg').textContent='...';const r=await fetch('/api/act',{method:'POST',body:JSON.stringify({a,v})});$('#msg').textContent=a+': '+(await r.json()).result}
+/* perf: only touch the DOM when the markup really changed */
+(()=>{const d=Object.getOwnPropertyDescriptor(Element.prototype,'innerHTML');document.querySelectorAll('[id]').forEach(e=>{let c;Object.defineProperty(e,'innerHTML',{get(){return d.get.call(this)},set(v){if(v!==c){c=v;d.set.call(this,v)}}})})})();
+/* perf: never repaint the page while the user is scrolling */
+let scT=0,pend=null,scTimer;
+addEventListener('scroll',()=>{document.body.classList.add('scrolling');scT=Date.now();clearTimeout(scTimer);scTimer=setTimeout(()=>{document.body.classList.remove('scrolling');if(pend){const p=pend;pend=null;paint(p)}},150)},{passive:true});
+async function A(a,v){$('#msg').textContent='...';const r=await fetch('/api/act',{method:'POST',body:JSON.stringify({a,v})});$('#msg').textContent=a+': '+(await r.json()).result;tick()}
 function SC(m){scale=m;$('#sl').classList.toggle('on',m=='lin');$('#sg').classList.toggle('on',m=='log');if(last)bars(last)}
 $('#chips').innerHTML='<span class=lab style="margin:0 6px 0 0">presets</span>'+[2,5,10,20,50,100,200].map(r=>`<button onclick="$('#rate').value=${r};ld()">${r} Mbps</button>`).join('');
 function ld(){const r=+$('#rate').value||0,p=Math.min(100,r/10*100);$('#ld').style.width=p+'%';$('#ld').style.background=r>10?'var(--bad)':r>=7?'var(--p95)':'var(--dy)';$('#ldt').textContent=r+' Mbps offered into the 10 Mbps bottleneck = '+Math.round(r/10*100)+'% of link capacity'+(r>10?' (congested)':'')}
@@ -357,7 +388,28 @@ let o=[0,.5,1].map(q=>`<text class=ax x="${L-6}" y="${Y(top*q/1.1)+4}" text-anch
 $('#nh').innerHTML=o;
 $('#subs').innerHTML=(s.clients||[]).length?s.clients.map(c=>`<button disabled>${c}</button>`).join(''):'<small style="color:var(--m)">none yet. Run python3 client.py 10.0.0.1 on a host.</small>';
 $('#feed').innerHTML=(s.feed||[]).map(a=>`<div class=fd><b class="p${a.prio}">${a.type} P${a.prio}</b><span>${a.msg.replace(/[<>&]/g,'')}</span><small>#${a.seq} ${new Date(a.t*1000).toLocaleTimeString()}</small></div>`).join('')||'<small style="color:var(--m)">No alerts yet.</small>'}
-async function tick(){const s=await (await fetch('/api/stats')).json();last=s;const bm=s.by_mode;
+let lastSent=0,aliveUntil=0;
+function topo(s){const st=s.state,down=st.link==='down',dyn=st.mode==='dynamic',net=s.net||{},rer=!!(net.ok&&net.alt>0.5);
+ if(s.sent>lastSent)aliveUntil=Date.now()+2500;lastSent=s.sent;const busy=Date.now()<aliveUntil;
+ let a,ac,altA=false;
+ if(!down){a='ALERTS \u2192 direct path s1-s3';ac='g'}
+ else if(dyn){a='ALERTS \u2192 detour via s2 (failover)';ac='o';altA=true}
+ else{a='LINK DOWN \u2192 alerts are LOST ('+st.mode+' mode has no failover)';ac='r'}
+ let b,bc,altB=false;
+ if(!st.iperf){b='background traffic: off';bc=''}
+ else if(down&&dyn){b='BACKGROUND \u2192 detour via s2';bc='o';altB=true}
+ else if(down){b='BACKGROUND \u2192 blocked (link down)';bc='r'}
+ else if(dyn&&rer){b='BACKGROUND \u2192 detour via s2 (rerouted)';bc='o';altB=true}
+ else{b='BACKGROUND \u2192 direct path s1-s3';bc='g'}
+ const altOn=altA||altB,active=st.iperf||busy;
+ $('#pa').className='pill '+ac;$('#pa').textContent=a;$('#pb').className='pill '+bc;$('#pb').textContent=b;
+ $('#dl').setAttribute('class',down?'down':'up'+((!altB&&active)?' flow':''));
+ $('#al').setAttribute('class',altOn?'on'+(active?' flow':''):'');
+ $('#ns2').setAttribute('class','nb'+(altOn?' hot':''));
+ $('#xm').setAttribute('class',down?'on':'');
+ $('#bdown').className='dg'+(down?' rd':'');$('#bup').className=down?'':'gn'}
+async function tick(){try{const s=await (await fetch('/api/stats')).json();if(Date.now()-scT<150)pend=s;else{pend=null;paint(s)}}catch(e){}}
+function paint(s){last=s;const bm=s.by_mode;topo(s);
 $('#modes').innerHTML=MS.map(m=>`<button class="${s.state.mode==m?'on':''}" onclick="A('mode','${m}')">${m}</button>`).join('');
 const K=(a,b)=>`<div class=k><b>${a}</b><small>${b}</small></div>`;
 $('#k').innerHTML=K(s.sent,'deliveries attempted')+K(s.acked,'ACKed')+K(s.retried,'retransmitted')+K(s.unreachable,'unreachable')+K(s.loss+'%','loss after retries')+K(s.first_try_loss+'%','first-try loss')+K(f(s.rtt_avg)+' ms','avg ACK round-trip');
@@ -367,7 +419,7 @@ $('#mc').innerHTML=MS.map(m=>{const x=bm[m],sp=(sa&&x.avg&&m!='static')?(sa/x.av
 $('#cmp').innerHTML='<tr><th>mode<th>sent<th>retx<th>lost<th>loss %<th>avg<th>p95<th>max</tr>'+MS.map(m=>{const x=bm[m];return `<tr><td><b style="color:${COL[m]}">${m}</b><td>${x.sent}<td>${x.retried}<td>${x.unreachable}<td>${f(x.loss)}<td>${f(x.avg)}<td>${f(x.p95)}<td>${f(x.max)}</tr>`}).join('');
 bars(s);line(s);extra(s);
 $('#t').innerHTML='<tr><th>seq<th>type<th>client<th>rtt<th>try<th>status</tr>'+s.recent.map(r=>`<tr class="${r.status!='ACKED'?'bad':''}"><td>${r.seq}<td>${r.type}<td>${r.client}<td>${r.rtt_ms}<td>${r.attempts}<td>${r.status}</tr>`).join('')}
-tick();setInterval(tick,1000);</script></body></html>"""
+(async function loop(){if(!document.hidden)await tick();setTimeout(loop,1000)})();</script></body></html>"""
 
 
 class H(BaseHTTPRequestHandler):
