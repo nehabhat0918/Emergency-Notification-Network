@@ -2,8 +2,7 @@
 
 CN mini project #16: a UDP-based emergency notification system. A server sends urgent alerts to many registered
 clients. An SDN controller (Ryu, OpenFlow 1.3) recognises emergency traffic, gives it priority, and reroutes other
-traffic when the link is crowded. Everything runs in Mininet. A second, standalone app (`app/`) sends messages
-between real machines with a live traffic monitor.
+traffic when the link is crowded. Everything runs in Mininet.
 
 ## Network
 ```
