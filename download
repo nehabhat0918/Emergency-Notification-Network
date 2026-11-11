@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+*.zip
+server_log.csv
+client_log_*.csv
+results/ryu.log
+results/dashboard.log
