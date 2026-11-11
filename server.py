@@ -5,6 +5,8 @@ TIMEOUT = 0.5
 RETRIES = 3
 TYPES = {"FIRE", "MEDICAL", "SECURITY", "GENERAL"}
 LOG = "server_log.csv"
+FEED = "alert_feed.jsonl"      # read by the dashboard's Alert feed panel
+CLIENTS = "clients.json"       # read by the dashboard's Connected clients list
 CTL = ("10.0.0.100", 9998)   # virtual controller IP (SDN event channel)
 
 sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -25,10 +27,31 @@ if not os.path.exists(LOG):
         csv.writer(f).writerow(["seq", "type", "priority", "client", "send_time",
                                 "ack_time", "rtt_ms", "attempts", "status"])
 
+def save_clients():
+    """Write the registered client IPs for the dashboard."""
+    try:
+        with lock:
+            names = sorted({c[0] for c in clients})
+        with open(CLIENTS, "w") as f:
+            json.dump(names, f)
+    except OSError:
+        pass
+
+def log_feed(seq, atype, prio, msg):
+    """Append one line per alert for the dashboard's Alert feed."""
+    try:
+        with open(FEED, "a") as f:
+            f.write(json.dumps({"t": time.time(), "seq": seq, "type": atype,
+                                "prio": int(prio), "msg": msg}) + "\n")
+    except (OSError, ValueError):
+        pass
+
 seq = 0
 clients = set()
 acked = {}   # seq -> {addr: ack_time}
 lock = threading.Lock()
+open(FEED, "w").close()      # fresh feed and client list for each server run
+save_clients()
 
 def receiver():
     while True:
@@ -37,6 +60,7 @@ def receiver():
         if text == "REGISTER":
             with lock:
                 clients.add(addr)
+            save_clients()
             notify("register", client=addr[0])
             print(f"\nregistered {addr}\nalert> ", end="", flush=True)
         elif text.startswith("BULK|"):
@@ -58,6 +82,7 @@ def receiver():
         elif text == "LEAVE":
             with lock:
                 clients.discard(addr)
+            save_clients()
             notify("unregister", client=addr[0])
             print(f"\nleft {addr}\nalert> ", end="", flush=True)
         elif text.startswith("ACK|"):
@@ -70,6 +95,7 @@ def receiver():
                     acked[s][addr] = time.time()
 
 def send_alert(seq, atype, prio, msg):
+    log_feed(seq, atype, prio, msg)
     with lock:
         targets = set(clients)
         acked[seq] = {}
